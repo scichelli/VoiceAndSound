@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en-US" dir="ltr">
+<head>
+	<title>Voice-Controlled Audio</title>
+</head>
+<body>
+	<h1>Voice-Controlled Audio</h1>
+	<p>
+		<button class="play-step" data-step="step1">Step 1</button>
+		<button class="play-step" data-step="step2">Step 2</button>
+		<button class="volume" data-volume="up">Volume Up</button>
+		<button class="volume" data-volume="down">Volume Down</button>
+	</p>
+	<h2>Step 1</h2>
+	<audio src="Instructions.mp3#t=6,9" preload="auto" controls class="audio-steps" id="step1" data-start="6" data-end="9"></audio>
+	<h2>Step 2</h2>
+	<audio src="Instructions.mp3#t=10,13" preload="auto" controls class="audio-steps" id="step2" data-start="10" data-end="13"></audio>
+	
+<script type="text/javascript">
+	function $(selector, container) {
+		return Array.prototype.slice.call((container || document).querySelectorAll(selector));
+	}
+		
+	function addEvent(elements, evnt, funct) {
+		var supportsAttachEvent = elements[0].attachEvent;
+		elements.forEach(function(element) {
+			if (supportsAttachEvent) {
+				element.attachEvent('on' + evnt, funct);
+			} else {
+				element.addEventListener(evnt, funct, false);
+			}
+		});
+	}
+	
+	addEvent($('.volume'), 'click', function(evnt) {
+		var direction = evnt.target.getAttribute('data-volume');
+		var players = $('.audio-steps');
+		var increment = 0.1 * (direction === 'up' ? 1 : -1);
+		players.forEach(function(element) { 
+			var newVolume = element.volume + increment;
+			if (newVolume >= 0 && newVolume <= 1) {
+				element.volume = newVolume;
+			}
+		});
+	});
+	
+	addEvent($('.play-step'), 'click', function(evnt) {
+		var step = evnt.target.getAttribute('data-step');
+		var player = $('#' + step)[0];
+		player.play();
+	});
+	
+</script>
+</body>
+</html>
