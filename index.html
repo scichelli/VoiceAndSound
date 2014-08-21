@@ -6,15 +6,17 @@
 <body>
 	<h1>Voice-Controlled Audio</h1>
 	<p>
-		<button class="play-step" data-step="step1">Step 1</button>
-		<button class="play-step" data-step="step2">Step 2</button>
+		<button class="listen">Start Listening</button>
+		<button class="play-step" data-step="1">Step 1</button>
+		<button class="play-step" data-step="2">Step 2</button>
 		<button class="volume" data-volume="up">Volume Up</button>
 		<button class="volume" data-volume="down">Volume Down</button>
 	</p>
+	<p><span id="listening-status">not started</span></p>
 	<h2>Step 1</h2>
-	<audio src="Instructions.mp3#t=6,9" preload="auto" controls class="audio-steps" id="step1" data-start="6" data-end="9"></audio>
+	<audio src="Instructions.mp3#t=6,9" preload="auto" controls class="audio-step" id="step1" data-start="6" data-end="9"></audio>
 	<h2>Step 2</h2>
-	<audio src="Instructions.mp3#t=10,13" preload="auto" controls class="audio-steps" id="step2" data-start="10" data-end="13"></audio>
+	<audio src="Instructions.mp3#t=10,13" preload="auto" controls class="audio-step" id="step2" data-start="10" data-end="13"></audio>
 	
 <script type="text/javascript">
 	function $(selector, container) {
@@ -31,25 +33,138 @@
 			}
 		});
 	}
+
+	var $status = $('#listening-status')[0];
+	function displayStatus(message) {
+		$status.innerHTML = message;
+	}
 	
-	addEvent($('.volume'), 'click', function(evnt) {
-		var direction = evnt.target.getAttribute('data-volume');
-		var players = $('.audio-steps');
-		var increment = 0.1 * (direction === 'up' ? 1 : -1);
-		players.forEach(function(element) { 
-			var newVolume = element.volume + increment;
-			if (newVolume >= 0 && newVolume <= 1) {
-				element.volume = newVolume;
+	(function(){
+		var _ = self.InstructionsListener = function() {
+			//For the speech API to work, set up an "application" in IIS so that access to the 
+			//microphone will be allowed. localhost/myApplication
+			
+			//To test if it's supported by the browser: if ('webkitSpeechRecognition' in window)
+			this.recognition = new webkitSpeechRecognition();
+		};
+		
+		_.prototype = {
+			start: function() {
+				displayStatus('trying');
+				this.recognition.start();
+			},
+			
+			stop: function() {
+				this.recognition.stop();
+			},
+						
+			initialize: function(player) {
+				this.player = player;
+
+				this.recognition.onstart = function() { displayStatus('listening'); };
+				this.recognition.onresult = function(event) { 
+					var result = event.results[0][0].transcript;
+					displayStatus(result);
+					switch(result) {
+						case "start":
+							player.playStep(1);
+							break;
+						case "next":
+							player.playNext();
+							break;
+						case "previous":
+							player.playPrevious();
+							break;
+						case "repeat":
+							player.repeat();
+							break;
+					}
+				};
+				this.recognition.onerror = function(event) { displayStatus(event.error); };
+				this.recognition.onend = function() {};
+				
+				this.start();
 			}
-		});
-	});
+		};
+	})();
 	
-	addEvent($('.play-step'), 'click', function(evnt) {
-		var step = evnt.target.getAttribute('data-step');
-		var player = $('#' + step)[0];
-		player.play();
-	});
+	(function(){
+		var _ = self.InstructionsPlayer = function(listener, totalSteps) {
+			this.currentStep = 1;
+			this.totalSteps = totalSteps;
+			this.listener = listener;
+			
+			this.playStep = function(step) {
+				listener.stop();
+				var audioControl = $('#step' + step)[0];
+				audioControl.play();
+			}
+			
+			addEvent($('.volume'), 'click', function(evnt) {
+				var direction = evnt.target.getAttribute('data-volume');
+				var audioControls = $('.audio-step');
+				var increment = 0.1 * (direction === 'up' ? 1 : -1);
+				audioControls.forEach(function(element) { 
+					var newVolume = element.volume + increment;
+					if (newVolume >= 0 && newVolume <= 1) {
+						element.volume = newVolume;
+					}
+				});
+			});
+			
+			addEvent($('.play-step'), 'click', function(evnt) {
+				var step = evnt.target.getAttribute('data-step');
+				player.playStep(step);
+			});
+
+			addEvent($('.listen'), 'click', function() { 
+				listener.start();
+			});
+						
+			addEvent($('.audio-step'), 'pause', function() {
+				displayStatus('finished');
+				listener.start();
+			});
+		}
+		
+		_.prototype = {
+			reloadStep: function(step) {
+				listener.stop();
+				var audioControl = $('#step' + step)[0];
+				audioControl.load();
+			},
+			
+			playNext: function() {
+				if (this.currentStep === this.totalSteps)
+				{
+					displayStatus('already at the final step');
+					return;
+				}
+				this.currentStep++;
+				this.playStep(this.currentStep);
+			},
+			
+			playPrevious: function() {
+				if (this.currentStep === 1)
+				{
+					displayStatus('already at the first step');
+					return;
+				}
+				this.currentStep--;
+				this.reloadStep(this.currentStep);
+				this.playStep(this.currentStep);
+			},
+			
+			repeat: function() {
+				this.reloadStep(this.currentStep);
+				this.playStep(this.currentStep);
+			}
+		};
+	})();
 	
+	var listener = new InstructionsListener();
+	var player = new InstructionsPlayer(listener, 2);
+	listener.initialize(player);
 </script>
 </body>
 </html>
